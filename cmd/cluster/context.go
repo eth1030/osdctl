@@ -377,7 +377,6 @@ func (o *contextOptions) generateContextData() (*contextData, []error) {
 	pdProvider, err := pagerduty.NewClient().
 		WithUserToken(o.usertoken).
 		WithOauthToken(o.oauthtoken).
-		WithBaseDomain(o.baseDomain).
 		WithTeamIdList(viper.GetStringSlice(pagerduty.PagerDutyTeamIDsKey)).
 		Init()
 	if err != nil {
@@ -658,7 +657,8 @@ func (o *contextOptions) generateContextData() (*contextData, []error) {
 		}
 
 		delayTracker := utils.StartDelayTracker(o.verbose, "PagerDuty Service")
-		pdServiceID, pdErr := pdProvider.GetPDServiceIDs()
+		// Classic PagerDuty service names are inferred from the cluster DNS base domain.
+		pdServiceID, pdErr := pdProvider.GetServiceIDs(o.baseDomain)
 		if pdErr != nil {
 			mu.Lock()
 			dataErrors = append(dataErrors, fmt.Errorf("error getting PD Service ID: %v", pdErr))
@@ -668,7 +668,7 @@ func (o *contextOptions) generateContextData() (*contextData, []error) {
 		delayTracker.End()
 
 		defer utils.StartDelayTracker(o.verbose, "current PagerDuty Alerts").End()
-		pdAlerts, paErr := pdProvider.GetFiringAlertsForCluster(data.pdServiceID)
+		pdAlerts, paErr := pdProvider.GetFiringAlertsForServices(data.pdServiceID)
 		if paErr != nil {
 			mu.Lock()
 			dataErrors = append(dataErrors, fmt.Errorf("error while getting current PD Alerts: %v", paErr))
@@ -764,7 +764,7 @@ func (o *contextOptions) generateContextData() (*contextData, []error) {
 			pdwg.Wait()
 			defer wg.Done()
 			defer utils.StartDelayTracker(o.verbose, "historical PagerDuty Alerts").End()
-			histAlerts, haErr := pdProvider.GetHistoricalAlertsForCluster(data.pdServiceID)
+			histAlerts, haErr := pdProvider.GetHistoricalAlertsForServices(data.pdServiceID)
 			if haErr != nil {
 				mu.Lock()
 				dataErrors = append(dataErrors, fmt.Errorf("error while getting historical PD Alert Data: %v", haErr))

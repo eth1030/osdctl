@@ -32,7 +32,6 @@ type pdClientInterface interface {
 
 type client struct {
 	pdclient   pdClientInterface
-	baseDomain string
 	teamIds    []string
 	userToken  string
 	oauthToken string
@@ -40,11 +39,6 @@ type client struct {
 
 func NewClient() *client {
 	return &client{}
-}
-
-func (c *client) WithBaseDomain(baseDomain string) *client {
-	c.baseDomain = baseDomain
-	return c
 }
 
 func (c *client) WithTeamIdList(teamIds []string) *client {
@@ -84,9 +78,10 @@ func (c *client) buildClient() error {
 	return fmt.Errorf("Could not build PagerDuty Client - No configured tokens")
 }
 
-func (c *client) GetPDServiceIDs() ([]string, error) {
-	// TODO : do we need this to be an exposed function or could we do this when we build the client?
-	lsResponse, err := c.pdclient.ListServicesWithContext(context.TODO(), pd.ListServiceOptions{Query: c.baseDomain, TeamIDs: c.teamIds})
+// GetServiceIDs searches service names within the configured teams. Callers choose
+// the query according to cluster routing; Classic services use the DNS base domain.
+func (c *client) GetServiceIDs(query string) ([]string, error) {
+	lsResponse, err := c.pdclient.ListServicesWithContext(context.TODO(), pd.ListServiceOptions{Query: query, TeamIDs: c.teamIds})
 	if err != nil {
 		return []string{}, fmt.Errorf("failed to ListServicesWithContext: %w", err)
 	}
@@ -99,7 +94,9 @@ func (c *client) GetPDServiceIDs() ([]string, error) {
 	return serviceIDS, nil
 }
 
-func (c *client) GetFiringAlertsForCluster(pdServiceIDs []string) (map[string][]pd.Incident, error) {
+// GetFiringAlertsForServices returns all active incidents for the services.
+// Shared services require callers to filter the results for the desired cluster.
+func (c *client) GetFiringAlertsForServices(pdServiceIDs []string) (map[string][]pd.Incident, error) {
 	incidents := map[string][]pd.Incident{}
 
 	var incidentLimit uint = 25
@@ -131,7 +128,9 @@ func (c *client) GetFiringAlertsForCluster(pdServiceIDs []string) (map[string][]
 	return incidents, nil
 }
 
-func (c *client) GetHistoricalAlertsForCluster(pdServiceIDs []string) (map[string][]*IncidentOccurrenceTracker, error) {
+// GetHistoricalAlertsForServices aggregates incidents across each service without
+// filtering by cluster, so callers must select services dedicated to that cluster.
+func (c *client) GetHistoricalAlertsForServices(pdServiceIDs []string) (map[string][]*IncidentOccurrenceTracker, error) {
 
 	var currentOffset uint
 	var limit uint = 100

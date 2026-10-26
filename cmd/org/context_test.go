@@ -19,11 +19,11 @@ type fakePDClient struct {
 	incidents  map[string][]pd.Incident
 }
 
-func (f *fakePDClient) GetPDServiceIDs() ([]string, error) {
+func (f *fakePDClient) GetServiceIDs(query string) ([]string, error) {
 	return f.serviceIDs, nil
 }
 
-func (f *fakePDClient) GetFiringAlertsForCluster(ids []string) (map[string][]pd.Incident, error) {
+func (f *fakePDClient) GetFiringAlertsForServices(ids []string) (map[string][]pd.Incident, error) {
 	return f.incidents, nil
 }
 
